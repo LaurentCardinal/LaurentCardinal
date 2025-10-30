@@ -1,10 +1,12 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Microsoft.Web.WebView2.Core;
-using System.Configuration;
-using System.Runtime.InteropServices;
 
 namespace KioskBrowser
 {
@@ -22,6 +24,15 @@ namespace KioskBrowser
             InitializeComponent();
             _config = KioskConfiguration.Load();
             InitializeAsync();
+            Closed += MainWindow_Closed;
+        }
+
+        private void MainWindow_Closed(object? sender, EventArgs e)
+        {
+            // Clean up timers to prevent memory leaks
+            _adminKeyTimer?.Stop();
+            _idleTimer?.Stop();
+            _loadingStoryboard?.Stop();
         }
 
         private async void InitializeAsync()
@@ -29,7 +40,7 @@ namespace KioskBrowser
             try
             {
                 // Initialize WebView2
-                await WebBrowser.EnsureCoreWebView2Async();
+                await WebBrowser.EnsureCoreWebView2Async(null);
 
                 // Configure WebView2 settings
                 WebBrowser.CoreWebView2.Settings.AreDefaultContextMenusEnabled = _config.EnableContextMenu;
@@ -74,11 +85,32 @@ namespace KioskBrowser
             }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to initialize browser: {ex.Message}",
-                    "Initialization Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                var errorMessage = ex.Message;
+
+                // Check if it's a WebView2 Runtime not found error
+                if (ex is System.IO.FileNotFoundException ||
+                    errorMessage.Contains("WebView2") ||
+                    errorMessage.Contains("runtime"))
+                {
+                    MessageBox.Show(
+                        "Microsoft Edge WebView2 Runtime is not installed.\n\n" +
+                        "Please download and install it from:\n" +
+                        "https://developer.microsoft.com/microsoft-edge/webview2/\n\n" +
+                        "The application will now exit.",
+                        "WebView2 Runtime Required",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    Application.Current.Shutdown();
+                }
+                else
+                {
+                    MessageBox.Show(
+                        $"Failed to initialize browser: {errorMessage}\n\n" +
+                        "Please ensure WebView2 Runtime is installed and try again.",
+                        "Initialization Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
             }
         }
 
@@ -121,8 +153,11 @@ namespace KioskBrowser
         {
             Dispatcher.Invoke(() =>
             {
-                PageTitleText.Text = WebBrowser.CoreWebView2.DocumentTitle;
-                Title = WebBrowser.CoreWebView2.DocumentTitle + " - Kiosk Browser";
+                if (WebBrowser?.CoreWebView2 != null)
+                {
+                    PageTitleText.Text = WebBrowser.CoreWebView2.DocumentTitle;
+                    Title = WebBrowser.CoreWebView2.DocumentTitle + " - Kiosk Browser";
+                }
             });
         }
 
@@ -130,14 +165,17 @@ namespace KioskBrowser
         {
             Dispatcher.Invoke(() =>
             {
-                BackButton.IsEnabled = WebBrowser.CanGoBack;
-                ForwardButton.IsEnabled = WebBrowser.CanGoForward;
+                if (WebBrowser != null)
+                {
+                    BackButton.IsEnabled = WebBrowser.CanGoBack;
+                    ForwardButton.IsEnabled = WebBrowser.CanGoForward;
+                }
             });
         }
 
         private void BackButton_Click(object sender, RoutedEventArgs e)
         {
-            if (WebBrowser.CanGoBack)
+            if (WebBrowser?.CanGoBack == true)
             {
                 WebBrowser.GoBack();
             }
@@ -145,7 +183,7 @@ namespace KioskBrowser
 
         private void ForwardButton_Click(object sender, RoutedEventArgs e)
         {
-            if (WebBrowser.CanGoForward)
+            if (WebBrowser?.CanGoForward == true)
             {
                 WebBrowser.GoForward();
             }
@@ -153,14 +191,25 @@ namespace KioskBrowser
 
         private void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            WebBrowser.Reload();
+            WebBrowser?.Reload();
         }
 
         private void HomeButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(_config.HomePage))
+            try
             {
-                WebBrowser.Source = new Uri(_config.HomePage);
+                if (!string.IsNullOrWhiteSpace(_config.HomePage) && WebBrowser != null)
+                {
+                    WebBrowser.Source = new Uri(_config.HomePage);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to navigate to home page: {ex.Message}",
+                    "Navigation Error",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
             }
         }
 
@@ -269,15 +318,36 @@ namespace KioskBrowser
 
         private async void SendKeysToWebView(string text)
         {
-            // Inject text into focused element in WebView2
-            await WebBrowser.CoreWebView2.ExecuteScriptAsync(
-                $"document.activeElement.value += '{text.Replace("'", "\\'")}';");
+            try
+            {
+                if (WebBrowser?.CoreWebView2 == null)
+                    return;
+
+                // Inject text into focused element in WebView2
+                await WebBrowser.CoreWebView2.ExecuteScriptAsync(
+                    $"document.activeElement.value += '{text.Replace("'", "\\'")}';");
+            }
+            catch (Exception ex)
+            {
+                // Silently fail - virtual keyboard errors shouldn't disrupt the user
+                System.Diagnostics.Debug.WriteLine($"SendKeysToWebView error: {ex.Message}");
+            }
         }
 
         private void PrintButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                if (WebBrowser?.CoreWebView2 == null)
+                {
+                    MessageBox.Show(
+                        "Browser is not ready. Please wait and try again.",
+                        "Print Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
                 WebBrowser.CoreWebView2.ShowPrintUI();
             }
             catch (Exception ex)
@@ -485,20 +555,34 @@ namespace KioskBrowser
 
         private void StartLoadingAnimation()
         {
-            var rotateTransform = (RotateTransform)LoadingSpinner.RenderTransform;
-            var animation = new DoubleAnimation
+            try
             {
-                From = 0,
-                To = 360,
-                Duration = TimeSpan.FromSeconds(1),
-                RepeatBehavior = RepeatBehavior.Forever
-            };
+                if (LoadingSpinner?.RenderTransform is not RotateTransform rotateTransform)
+                {
+                    // Initialize RotateTransform if it doesn't exist
+                    rotateTransform = new RotateTransform(0, 24, 24);
+                    LoadingSpinner.RenderTransform = rotateTransform;
+                }
 
-            _loadingStoryboard = new Storyboard();
-            _loadingStoryboard.Children.Add(animation);
-            Storyboard.SetTarget(animation, rotateTransform);
-            Storyboard.SetTargetProperty(animation, new PropertyPath(RotateTransform.AngleProperty));
-            _loadingStoryboard.Begin();
+                var animation = new DoubleAnimation
+                {
+                    From = 0,
+                    To = 360,
+                    Duration = TimeSpan.FromSeconds(1),
+                    RepeatBehavior = RepeatBehavior.Forever
+                };
+
+                _loadingStoryboard = new Storyboard();
+                _loadingStoryboard.Children.Add(animation);
+                Storyboard.SetTarget(animation, rotateTransform);
+                Storyboard.SetTargetProperty(animation, new PropertyPath(RotateTransform.AngleProperty));
+                _loadingStoryboard.Begin();
+            }
+            catch (Exception ex)
+            {
+                // Animation errors shouldn't break the app
+                System.Diagnostics.Debug.WriteLine($"Loading animation error: {ex.Message}");
+            }
         }
 
         private void StopLoadingAnimation()

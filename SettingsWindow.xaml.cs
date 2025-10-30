@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using Microsoft.Win32;
 
@@ -34,7 +35,28 @@ namespace KioskBrowser
         {
             try
             {
-                _config.HomePage = HomePageTextBox.Text;
+                // Validate HomePage URL
+                var homePage = HomePageTextBox.Text.Trim();
+                if (!string.IsNullOrEmpty(homePage))
+                {
+                    if (!homePage.StartsWith("http://") && !homePage.StartsWith("https://"))
+                    {
+                        homePage = "https://" + homePage;
+                    }
+
+                    // Validate it's a valid URI
+                    if (!Uri.TryCreate(homePage, UriKind.Absolute, out _))
+                    {
+                        MessageBox.Show(
+                            "Please enter a valid home page URL.",
+                            "Invalid URL",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        return;
+                    }
+                }
+
+                _config.HomePage = homePage;
                 _config.StartFullscreen = StartFullscreenCheckBox.IsChecked ?? true;
                 _config.ShowVirtualKeyboard = ShowKeyboardCheckBox.IsChecked ?? true;
                 _config.EnableContextMenu = EnableContextMenuCheckBox.IsChecked ?? false;
@@ -44,9 +66,18 @@ namespace KioskBrowser
                 _config.AllowDownloads = AllowDownloadsCheckBox.IsChecked ?? false;
                 _config.DownloadPath = DownloadPathTextBox.Text;
 
-                if (int.TryParse(IdleTimeoutTextBox.Text, out int timeout))
+                if (int.TryParse(IdleTimeoutTextBox.Text, out int timeout) && timeout >= 0)
                 {
                     _config.IdleTimeoutMinutes = timeout;
+                }
+                else
+                {
+                    MessageBox.Show(
+                        "Please enter a valid idle timeout (0 or greater).",
+                        "Invalid Timeout",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
                 }
 
                 _config.Save();
@@ -100,6 +131,10 @@ namespace KioskBrowser
 
         private void UpdateDownloadControls()
         {
+            // Ensure controls are initialized
+            if (AllowDownloadsCheckBox == null || DownloadPathTextBox == null || BrowseButton == null)
+                return;
+
             bool isEnabled = AllowDownloadsCheckBox.IsChecked ?? false;
             DownloadPathTextBox.IsEnabled = isEnabled;
             BrowseButton.IsEnabled = isEnabled;
