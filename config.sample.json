@@ -1,0 +1,12 @@
+{
+  "HomePage": "https://www.google.com",
+  "StartFullscreen": true,
+  "ShowVirtualKeyboard": true,
+  "EnableContextMenu": false,
+  "EnableZoom": true,
+  "EnablePrinting": true,
+  "IdleTimeoutMinutes": 5,
+  "BlockedDomains": "",
+  "AllowDownloads": false,
+  "DownloadPath": ""
+}

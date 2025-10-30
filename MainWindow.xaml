@@ -1,0 +1,281 @@
+<Window x:Class="KioskBrowser.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Kiosk Browser"
+        WindowState="Maximized"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        Background="{StaticResource BackgroundBrush}"
+        KeyDown="Window_KeyDown">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Navigation Bar -->
+        <Border Grid.Row="0"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Navigation Controls -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <!-- Back Button -->
+                    <Button x:Name="BackButton"
+                            Style="{StaticResource IconButton}"
+                            Click="BackButton_Click"
+                            ToolTip="Go back (Alt+Left)"
+                            IsEnabled="False">
+                        <TextBlock Text="◄" FontSize="18" FontWeight="Bold"/>
+                    </Button>
+
+                    <!-- Forward Button -->
+                    <Button x:Name="ForwardButton"
+                            Style="{StaticResource IconButton}"
+                            Click="ForwardButton_Click"
+                            ToolTip="Go forward (Alt+Right)"
+                            IsEnabled="False">
+                        <TextBlock Text="►" FontSize="18" FontWeight="Bold"/>
+                    </Button>
+
+                    <!-- Refresh Button -->
+                    <Button x:Name="RefreshButton"
+                            Style="{StaticResource IconButton}"
+                            Click="RefreshButton_Click"
+                            ToolTip="Refresh page (F5)">
+                        <TextBlock Text="↻" FontSize="20" FontWeight="Bold"/>
+                    </Button>
+
+                    <!-- Home Button -->
+                    <Button x:Name="HomeButton"
+                            Style="{StaticResource IconButton}"
+                            Click="HomeButton_Click"
+                            ToolTip="Go to home page (Alt+Home)">
+                        <TextBlock Text="⌂" FontSize="20" FontWeight="Bold"/>
+                    </Button>
+                </StackPanel>
+
+                <!-- URL/Search Bar (Hidden in kiosk mode, shown with keyboard shortcut) -->
+                <StackPanel Grid.Column="1"
+                           Orientation="Horizontal"
+                           Margin="16,0"
+                           x:Name="UrlPanel"
+                           Visibility="Collapsed">
+                    <TextBox x:Name="UrlTextBox"
+                             Style="{StaticResource ModernTextBox}"
+                             Width="500"
+                             KeyDown="UrlTextBox_KeyDown"
+                             GotFocus="UrlTextBox_GotFocus"
+                             Text="https://www.google.com"/>
+                    <Button Content="Go"
+                            Style="{StaticResource ModernButton}"
+                            Click="GoButton_Click"
+                            Margin="8,0,0,0"
+                            Padding="24,10"/>
+                </StackPanel>
+
+                <!-- Page Title Display -->
+                <TextBlock x:Name="PageTitleText"
+                          Grid.Column="1"
+                          Text="Kiosk Browser"
+                          FontSize="16"
+                          FontWeight="SemiBold"
+                          Foreground="{StaticResource TextPrimaryBrush}"
+                          VerticalAlignment="Center"
+                          HorizontalAlignment="Center"
+                          TextTrimming="CharacterEllipsis"
+                          Margin="16,0"/>
+
+                <!-- Action Buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!-- Virtual Keyboard Button -->
+                    <Button x:Name="KeyboardButton"
+                            Style="{StaticResource IconButton}"
+                            Click="KeyboardButton_Click"
+                            ToolTip="Toggle virtual keyboard (F2)">
+                        <TextBlock Text="⌨" FontSize="20"/>
+                    </Button>
+
+                    <!-- Print Button -->
+                    <Button x:Name="PrintButton"
+                            Style="{StaticResource IconButton}"
+                            Click="PrintButton_Click"
+                            ToolTip="Print page (Ctrl+P)">
+                        <TextBlock Text="🖨" FontSize="18"/>
+                    </Button>
+
+                    <!-- Fullscreen Toggle -->
+                    <Button x:Name="FullscreenButton"
+                            Style="{StaticResource IconButton}"
+                            Click="FullscreenButton_Click"
+                            ToolTip="Toggle fullscreen (F11)">
+                        <TextBlock Text="⛶" FontSize="20"/>
+                    </Button>
+
+                    <!-- Settings Button (Admin only) -->
+                    <Button x:Name="SettingsButton"
+                            Style="{StaticResource IconButton}"
+                            Click="SettingsButton_Click"
+                            ToolTip="Settings (Ctrl+Alt+S)"
+                            Visibility="Collapsed">
+                        <TextBlock Text="⚙" FontSize="20"/>
+                    </Button>
+
+                    <!-- Exit Button (Admin only) -->
+                    <Button x:Name="ExitButton"
+                            Style="{StaticResource IconButton}"
+                            Click="ExitButton_Click"
+                            ToolTip="Exit application (Ctrl+Alt+X)"
+                            Visibility="Collapsed">
+                        <TextBlock Text="✕" FontSize="20" FontWeight="Bold"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Loading Indicator -->
+        <Border Grid.Row="1"
+                x:Name="LoadingPanel"
+                Background="#80000000"
+                Visibility="Collapsed"
+                Panel.ZIndex="100">
+            <StackPanel VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       Background="{StaticResource SurfaceBrush}"
+                       Padding="40"
+                       CornerRadius="16">
+                <TextBlock Text="⟳"
+                          FontSize="48"
+                          Foreground="{StaticResource PrimaryBrush}"
+                          HorizontalAlignment="Center"
+                          Margin="0,0,0,16"
+                          x:Name="LoadingSpinner">
+                    <TextBlock.RenderTransform>
+                        <RotateTransform Angle="0" CenterX="24" CenterY="24"/>
+                    </TextBlock.RenderTransform>
+                </TextBlock>
+                <TextBlock Text="Loading..."
+                          FontSize="18"
+                          Foreground="{StaticResource TextSecondaryBrush}"
+                          HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- WebView2 Browser -->
+        <wv2:WebView2 x:Name="WebBrowser"
+                      Grid.Row="1"
+                      Source="https://www.google.com"
+                      NavigationStarting="WebBrowser_NavigationStarting"
+                      NavigationCompleted="WebBrowser_NavigationCompleted"/>
+
+        <!-- Virtual Keyboard Container -->
+        <Border Grid.Row="1"
+                x:Name="VirtualKeyboardPanel"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,2,0,0"
+                VerticalAlignment="Bottom"
+                Visibility="Collapsed"
+                Height="300"
+                Panel.ZIndex="50">
+            <Grid Margin="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Keyboard Header -->
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <TextBlock Text="Virtual Keyboard"
+                              FontSize="16"
+                              FontWeight="SemiBold"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              VerticalAlignment="Center"/>
+                    <Button Content="✕"
+                            Style="{StaticResource IconButton}"
+                            Click="CloseKeyboard_Click"
+                            HorizontalAlignment="Right"
+                            Width="36"
+                            Height="36"
+                            Padding="0"/>
+                </Grid>
+
+                <!-- Keyboard Keys -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="KeyboardContainer">
+                        <!-- Row 1: Numbers -->
+                        <UniformGrid Rows="1" Columns="10" Margin="0,4">
+                            <Button Content="1" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="1"/>
+                            <Button Content="2" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="2"/>
+                            <Button Content="3" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="3"/>
+                            <Button Content="4" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="4"/>
+                            <Button Content="5" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="5"/>
+                            <Button Content="6" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="6"/>
+                            <Button Content="7" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="7"/>
+                            <Button Content="8" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="8"/>
+                            <Button Content="9" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="9"/>
+                            <Button Content="0" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="0"/>
+                        </UniformGrid>
+
+                        <!-- Row 2: Top Letter Row -->
+                        <UniformGrid Rows="1" Columns="10" Margin="0,4">
+                            <Button Content="Q" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="Q"/>
+                            <Button Content="W" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="W"/>
+                            <Button Content="E" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="E"/>
+                            <Button Content="R" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="R"/>
+                            <Button Content="T" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="T"/>
+                            <Button Content="Y" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="Y"/>
+                            <Button Content="U" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="U"/>
+                            <Button Content="I" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="I"/>
+                            <Button Content="O" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="O"/>
+                            <Button Content="P" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="P"/>
+                        </UniformGrid>
+
+                        <!-- Row 3: Middle Letter Row -->
+                        <UniformGrid Rows="1" Columns="9" Margin="0,4">
+                            <Button Content="A" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="A"/>
+                            <Button Content="S" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="S"/>
+                            <Button Content="D" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="D"/>
+                            <Button Content="F" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="F"/>
+                            <Button Content="G" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="G"/>
+                            <Button Content="H" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="H"/>
+                            <Button Content="J" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="J"/>
+                            <Button Content="K" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="K"/>
+                            <Button Content="L" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="L"/>
+                        </UniformGrid>
+
+                        <!-- Row 4: Bottom Letter Row -->
+                        <UniformGrid Rows="1" Columns="7" Margin="0,4">
+                            <Button Content="Z" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="Z"/>
+                            <Button Content="X" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="X"/>
+                            <Button Content="C" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="C"/>
+                            <Button Content="V" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="V"/>
+                            <Button Content="B" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="B"/>
+                            <Button Content="N" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="N"/>
+                            <Button Content="M" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="M"/>
+                        </UniformGrid>
+
+                        <!-- Row 5: Special Keys -->
+                        <UniformGrid Rows="1" Columns="5" Margin="0,4">
+                            <Button Content="Space" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag=" "/>
+                            <Button Content="." Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="."/>
+                            <Button Content="@" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag="@"/>
+                            <Button Content=".com" Style="{StaticResource ModernButton}" Click="VirtualKey_Click" Tag=".com"/>
+                            <Button Content="⌫ Back" Style="{StaticResource ModernButton}" Click="VirtualBackspace_Click"/>
+                        </UniformGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
